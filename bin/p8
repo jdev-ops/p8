@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+name=$(cut -d "/" -f2- <<<$1)
+name_result="$name-dev.zip"
+name="$name-dev"
+wget "https://github.com/$1/archive/dev.zip" -O $name_result
+unzip $name_result
+
+export TEMPLATE_PATH=$(realpath $name)
+export DESTINATION_PATH=$(realpath .)
+
+_p8
+
+rm -Rf $name_result
+rm -Rf $name

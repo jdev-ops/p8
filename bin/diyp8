@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+echo -e "Choose template:"
+DIY_P8_TEMPLATE=$(gum choose "phoenix_template" "elixir_lib_template")
+
+INSTALL_COMMAND="p8 jdev-ops/$DIY_P8_TEMPLATE"
+
+echo -e "Wait for it..."
+$INSTALL_COMMAND
+
+FOLDER=$(ls -d */ | sed 's/.$//' | gum filter --placeholder "Select your project:")
+cd $FOLDER
+
+gum confirm "Init git repo?" && (git init && git add . && git commit -m "Initial commit")
+gum confirm "Get deps?" && (mix deps.get && iex -S mix) || (gum confirm "Launch VSCode?" && code .)
