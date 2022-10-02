@@ -27,7 +27,7 @@ setuptools.setup(
     ],
     entry_points={
         "console_scripts": [
-            "_p8=templates.generator:main",
+            "_p8=p8.generator.main:main",
         ],
     },
 )

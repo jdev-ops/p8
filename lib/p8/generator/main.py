@@ -16,6 +16,7 @@ def main():
     path = os.getenv("TEMPLATE_PATH")
     destination = os.getenv("DESTINATION_PATH")
     config_path = f"{path}/default.ini"
+
     print(f"Reading configs from: {config_path}")
     config.read(config_path)
 
@@ -23,19 +24,28 @@ def main():
     data = dict(data)
     normal = {k: v for k, v in data.items() if not v.startswith("$")}
     expressions = {k: v[1:] for k, v in data.items() if v.startswith("$")}
-    for k, v in normal.items():
-        exec(f"{k} = data['{k}']")
-    for k, v in expressions.items():
-        exec(f"data['{k}']= {v}")
 
-    data1 = normal | expressions
+    def create_or_update_dynamic_env(data):
+        for k, v in normal.items():
+            exec(f"{k} = data['{k}']")
+        for k, v in expressions.items():
+            exec(f"data['{k}']= {v}")
 
-    for k, v in data1.items():
-        s = f"""    {k}_ = input('What {k}? [{data[k]}]: ')
+    def read_key_values(d):
+        for k, v in d.items():
+            s = f"""    {k}_ = input('What {k}? [{data[k]}]: ')
 if {k}_ != "":
     data['{k}'] = {k}_""".strip()
 
-        exec(s)
+            exec(s)
+
+    create_or_update_dynamic_env(data)
+
+    read_key_values(normal)
+
+    create_or_update_dynamic_env(data)
+
+    read_key_values(expressions)
 
     for root, dirs, files in os.walk(path):
         nroot = root[len(path) :]
@@ -49,6 +59,6 @@ if {k}_ != "":
         for f in files:
             if f != "default.ini":
                 template = Template(open(f"{root}/{f}").read())
-                tfileName = Template(f)
-                f = tfileName.render(data)
+                template_file_name = Template(f)
+                f = template_file_name.render(data)
                 open(f"{ndir}/{f}", "w").write(template.render(data))
