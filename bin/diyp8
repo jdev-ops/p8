@@ -2,8 +2,9 @@
 
 set -euo pipefail
 
+IFS=',' read -r -a array <<< "$PROJECT_TEMPLATES"
 echo -e "Choose template:"
-DIY_P8_TEMPLATE=$(gum choose "phoenix_template" "elixir_lib_template")
+DIY_P8_TEMPLATE=$(gum choose ${array[@]})
 
 INSTALL_COMMAND="p8 jdev-ops/$DIY_P8_TEMPLATE"
 
