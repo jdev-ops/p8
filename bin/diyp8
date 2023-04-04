@@ -15,4 +15,4 @@ FOLDER=$(ls -d */ | sed 's/.$//' | gum filter --placeholder "Select your project
 cd $FOLDER
 
 gum confirm "Init git repo?" && (git init && git add . && git commit -m "Initial commit")
-gum confirm "Get deps?" && (mix deps.get && iex -S mix) || (gum confirm "Launch VSCode?" && code .)
+#gum confirm "Get deps?" && (mix deps.get && iex -S mix) || (gum confirm "Launch VSCode?" && code .)
