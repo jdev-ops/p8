@@ -8,7 +8,7 @@ lazy val root = (project in file("."))
     libraryDependencies ++= Seq(
       "org.scala-lang" %% "scala3-compiler" % scalaVersion.value,
       "org.apache.commons" % "commons-configuration2" % "2.8.0",
-      "com.github.jknack" % "handlebars" % "4.3.1",
+      "com.hubspot.jinjava" % "jinjava" % "2.7.0",
     )
   )
 
@@ -17,7 +17,8 @@ lazy val root = (project in file("."))
 // https://docs.scala-lang.org/scala3/guides/migration/tooling-syntax-rewriting.html
 // build.sbt, for Scala 3 project
 //scalacOptions ++= Seq("-new-syntax", "-rewrite")
-scalacOptions ++= Seq("-indent", "-rewrite")
+//scalacOptions ++= Seq("-indent", "-rewrite")
+scalacOptions ++= Seq("--explain")
 
 addCommandAlias("r", ";run")
 addCommandAlias("t", ";test")

@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-IFS=',' read -r -a array <<< "$PROJECT_TEMPLATES"
+IFS=',' read -r -a array <<<"$PROJECT_TEMPLATES"
 echo -e "Choose template:"
 DIY_P8_TEMPLATE=$(gum choose ${array[@]})
 

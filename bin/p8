@@ -9,7 +9,81 @@ unzip $name_result
 export TEMPLATE_PATH=$(realpath $name)
 export DESTINATION_PATH=$(realpath .)
 
+mkdir -p .p8
+
+joinByString() {
+  local separator="$1"
+  shift
+  local first="$1"
+  shift
+  printf "%s" "$first" "${@/#/$separator}"
+}
+
+while :; do
+  array=$(crudini --get $TEMPLATE_PATH/.default.ini DEFAULT)
+  array="$array
+done"
+  IFS=$'\n'
+  array2=($array)
+  a=$(gum choose "${array2[@]}")
+  if [[ $a == done ]]; then
+    break
+  fi
+  cValue=$(crudini --get $TEMPLATE_PATH/.default.ini DEFAULT $a)
+  if [[ $cValue == '#'* ]]; then
+    cValue="${cValue:1}"
+    IFS='|'
+    read -a strarr <<<"$cValue"
+    aValue=$(gum choose --no-limit "${strarr[@]}")
+    if test -f ".p8/$a"; then
+      rm ".p8/$a"
+    fi
+
+    IFS=$'\n'
+    aValue=($aValue)
+    aValue=$(joinByString "|" "${aValue[@]}")
+
+    echo -n "#"$aValue >.p8/$a
+
+  else
+
+    aValue=$(gum input --placeholder "$(crudini --get $TEMPLATE_PATH/.default.ini DEFAULT $a)")
+    if [[ $aValue == "" ]]; then
+      aValue="$(crudini --get $TEMPLATE_PATH/.default.ini DEFAULT $a)"
+    fi
+
+    if test -f ".p8/$a"; then
+      rm ".p8/$a"
+    fi
+
+    echo -n $aValue >.p8/$a
+
+  fi
+
+done
+
+# set default values
+array=$(crudini --get $TEMPLATE_PATH/.default.ini DEFAULT)
+IFS=$'\n'
+array=($array)
+
+for index in "${!array[@]}"; do
+  key="${array[$index]}"
+  value=$(crudini --get $TEMPLATE_PATH/.default.ini DEFAULT $key)
+  if [ ! -f ".p8/$key" ]; then
+    echo -n $value >.p8/$key
+  fi
+done
+
+array=$(ls .p8)
+IFS=$'\n'
+array=($array)
+
+for index in "${!array[@]}"; do
+  export "P8_PARAM_${array[$index]}"="$(cat .p8/${array[$index]})"
+done
 _p8
 
 rm -Rf $name_result
 rm -Rf $name
+rm -Rf .p8

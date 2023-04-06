@@ -1,9 +1,9 @@
 //> using scala "3.2.2"
 //> using lib "org.scala-lang::scala3-compiler:3.2.2"
 //> using lib "org.apache.commons:commons-configuration2:2.9.0"
-//> using lib "com.github.jknack:handlebars:4.3.1"
+//> using lib "com.hubspot.jinjava:jinjava:2.7.0"
 
-import com.github.jknack.handlebars.Handlebars
+import com.hubspot.jinjava.Jinjava
 import org.apache.commons.configuration2.INIConfiguration
 
 import java.io.{File, FileReader, FileWriter}
@@ -14,7 +14,6 @@ import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 import scala.io.StdIn.readLine
 import java.nio.file.{Files, Paths}
-
 import math.Fractional.Implicits.infixFractionalOps
 import math.Integral.Implicits.infixIntegralOps
 import math.Numeric.Implicits.infixNumericOps
@@ -38,7 +37,13 @@ extension (b: File)
   def startsWithAny(strs: String*): Boolean =
     strs.exists(b.getName.startsWith(_))
 
-def camel_to_snake(str: String): String =
+def convertToListWhenApply(v: String): util.List[String] | String =
+  if v.startsWith("#") then
+    v.substring(1).split('|').map(_.strip).toList.asJava
+  else
+    v
+
+def camelToSnake(str: String): String =
   // Regular Expression
   val regex = "([a-z])([A-Z]+)"
   // Replacement string
@@ -48,9 +53,7 @@ def camel_to_snake(str: String): String =
   // and convert it to lower case.
   str.replaceAll(regex, replacement).toLowerCase
 
-var data: mutable.HashMap[String, String] = mutable.HashMap[String, String]()
-
-def readDataFromINI(path: String): mutable.HashMap[String, String] =
+def readDataFromINI(path: String, segment: String = "DEFAULT"): mutable.HashMap[String, String] =
   val iniFileContents = new mutable.HashMap[String, mutable.HashMap[String, String]]
   val fileToParse = new File(path)
   val iniConfiguration = new INIConfiguration()
@@ -65,7 +68,7 @@ def readDataFromINI(path: String): mutable.HashMap[String, String] =
       val value = confSection.getProperty(key).toString
       subSectionMap.put(key, value)
     iniFileContents.put(section, subSectionMap)
-  iniFileContents("DEFAULT")
+  iniFileContents(segment)
 
 object os:
   def walk(start: File, body: (String, mutable.ListBuffer[File], Seq[File]) => Unit): Unit =
@@ -74,93 +77,62 @@ object os:
     body(start.getAbsolutePath, allDirs, allFiles)
     for d <- allDirs do walk(d, body)
 
+def readFile(f: File): String =
+  val bufferedSource = scala.io.Source.fromFile(f)
+  val str = bufferedSource.getLines().mkString("\n")
+  bufferedSource.close()
+  str
+
+def writeToFile(fileDir: String, content: String): Unit =
+  val fileWriter = new FileWriter(new File(fileDir))
+  fileWriter.write(content)
+  fileWriter.close()
+
 @main
 def main(): Unit =
-  val path = System.getenv("TEMPLATE_PATH")
-  val destination = System.getenv("DESTINATION_PATH")
-  val config_path = f"${path}/.default.ini"
-  data ++= readDataFromINI(config_path)
-//  File(config_path).delete()
-  val normal = for (k, v) <- data if !v.startsWith("$") yield (k, v)
-
-  val expressions = for (k, v) <- data if v.startsWith("$") yield (k, v.substring(1))
-  val m = new javax.script.ScriptEngineManager(getClass.getClassLoader)
-  val e = m.getEngineByName("scala")
-
-  def createDynamicEnv(): Unit =
-    for (k, v) <- normal do
-      e.eval(f"var ${k} = \"${v}\"")
-
-    for (k, v) <- expressions do
-      e.eval(f"var ${k} = \"${v}\"")
-
-  def createOrUpdateDynamicEnv(): Unit =
-    for (k, v) <- normal do
-//      e.eval(f"var ${k} = \"${v}\"")
-      e.eval(f"data(\"${k}\") = ${k}")
-
-    for (k, v) <- expressions do
-//      e.eval(f"var ${k} = \"${v}\"")
-      e.eval(f"data(\"${k}\") = ${v}")
-
-
-  def updateExpressions(): Unit =
-    for (k, v) <- expressions do
-      e.eval(f"data(\"${k}\") = ${v}")
-
-  def readKeyValues(d: mutable.Map[String, String]): Unit =
-    for (k, _) <- d do
-      e.eval(
-        f"""
-           |  print(\"What ${k}? [${data(k)}]: \")
-           |  var ${k}_ = scala.io.StdIn.readLine()
-           |  if (${k}_ != ""){
-           |    data(\"${k}\") = ${k}_
-           |    ${k} = ${k}_
-           |  }
-           | """.stripMargin
-      )
-
-  createDynamicEnv()
-  createOrUpdateDynamicEnv()
-  readKeyValues(normal)
-  updateExpressions()
+  val configurationFileName: String = Option(System.getenv("CONFIGURATION_FILE_NAME")).getOrElse(".default.ini")
+  val selectorFileName: String = Option(System.getenv("SELECTOR_FILE_NAME")).getOrElse(".selector.ini")
+  val prefix: String = Option(System.getenv("PARAMETERS_PREFIX")).getOrElse("P8_PARAM_")
+  val path: String = System.getenv("TEMPLATE_PATH")
+  if path == null then
+    println("TEMPLATE_PATH is not set")
+    System.exit(1)
+  val destination: String = System.getenv("DESTINATION_PATH")
+  if destination == null then
+    println("DESTINATION_PATH is not set")
+    System.exit(1)
+  val config_path = Paths.get(path, configurationFileName).toString
+  val sData = readDataFromINI(config_path, "DOMAIN")
+  val support_data: mutable.Map[String, String | util.List[String]] = for ((k, v) <- sData) yield (k, convertToListWhenApply(v))
+  val d = System.getenv()
+  val data: mutable.Map[String, util.List[String] | String] = for ((k, v) <- d.asScala if k.startsWith(prefix)) yield (k.substring(prefix.length), convertToListWhenApply(v))
 
   val jdata = data.asJava
-  val handlebars = Handlebars()
-
-  def readFile(f: File): String =
-    val bufferedSource = scala.io.Source.fromFile(f)
-    val str = bufferedSource.getLines().mkString("\n")
-    bufferedSource.close()
-    str
-
-  def writeToFile(fileDir: String, content: String): Unit =
-    val fileWriter = new FileWriter(new File(fileDir))
-    fileWriter.write(content)
-    fileWriter.close()
+  val jinjava = new Jinjava();
 
   os.walk(new File(path), (root, dirs, files) => {
     dirs.remove(_.startsWithAny(".git", ".idea"))
     val nroot = root.substring(path.length)
-    var ndir = f"${destination}/$nroot"
-    var template = handlebars.compileInline(ndir)
-    ndir = template.apply(jdata)
+    var template = Paths.get(destination, nroot).toString
+    val ndir = jinjava.render(template, jdata)
     if !File(ndir).isDirectory then
       Files.createDirectories(Paths.get(ndir))
+    for f <- files if f.getName == selectorFileName do
+      val selectorDataCurrentDir = readDataFromINI(f.getAbsolutePath, "DEFAULT")
+      val dirActives = data(selectorDataCurrentDir("value")).asInstanceOf[util.List[String]].asScala.toSet
+      val allDir = support_data(selectorDataCurrentDir("value")).asInstanceOf[util.List[String]].asScala.toSet
+      for delDir <- allDir -- dirActives do
+        dirs.remove(_.getName == delDir)
 
-    for f <- files if !(f.getName == ".default.ini") do
+    for f <- files if f.getName != configurationFileName && f.getName != selectorFileName do
       val allBytes = Files.readAllBytes(Paths.get(f.getCanonicalPath))
       if isValidUTF8(allBytes) then
-        val str = readFile(f)
-        template = handlebars.compileInline(str)
-        val templateFileName = handlebars.compileInline(f.getName)
-        val ff = templateFileName.apply(jdata)
-        writeToFile(f"${ndir}/${ff}", template.apply(jdata))
+        template = readFile(f)
+        val filePath = jinjava.render(f.getName, jdata)
+        val fToWrite = Paths.get(ndir, filePath)
+        writeToFile(fToWrite.toString, jinjava.render(template, jdata))
       else
-        val templateFileName = handlebars.compileInline(f.getName)
-        val ff = templateFileName.apply(jdata)
-        Files.write(Paths.get(f"${ndir}/${ff}"), allBytes)
+        val filePath = jinjava.render(f.getName, jdata)
+        Files.write(Paths.get(ndir, filePath), allBytes)
 
   })
-
