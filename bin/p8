@@ -1,15 +1,47 @@
 #!/usr/bin/env bash
 
-name=$(cut -d "/" -f2- <<<$1)
-name_result="$name-dev.zip"
-name="$name-dev"
-wget "https://github.com/$1/archive/dev.zip" -O $name_result
-unzip $name_result
+shopt -s expand_aliases
 
-export TEMPLATE_PATH=$(realpath $name)
+command -v _p8 >/dev/null 2>&1
+cmd_result=$?
+if [ $cmd_result -ne 0 ]; then
+    command -v _p8.jar >/dev/null 2>&1
+    cmd_result=$?
+    if [ $cmd_result -ne 0 ]; then
+      echo "You do not have _p8.jar in your path, please install it to continue"
+      exit 1
+    else
+      alias _p8="_p8.jar"
+    fi
+fi
+
+command -v crudini >/dev/null 2>&1
+cmd_result=$?
+if [ $cmd_result -ne 0 ]; then
+  alias crudini="_p8.jar"
+fi
+
+command -v git >/dev/null 2>&1
+cmd_result=$?
+if [ $cmd_result -ne 0 ]; then
+  echo "You do not have git in your path, please install it to continue"
+  exit 1
+fi
+
+command -v gum >/dev/null 2>&1
+cmd_result=$?
+if [ $cmd_result -ne 0 ]; then
+  echo "You do not have gum in your path, please install it to continue: https://github.com/charmbracelet/gum"
+  exit 1
+fi
+
+name=$(cut -d "/" -f2- <<<$1)
+mkdir -p .p8
+git clone git@github.com:$1 --depth 1 .p8/$name
+
+export TEMPLATE_PATH=$(realpath .p8/$name)
 export DESTINATION_PATH=$(realpath .)
 
-mkdir -p .p8
 
 joinByString() {
   local separator="$1"
@@ -75,15 +107,14 @@ for index in "${!array[@]}"; do
   fi
 done
 
-array=$(ls .p8)
+array=$(ls -p .p8 | grep -v /)
 IFS=$'\n'
 array=($array)
 
 for index in "${!array[@]}"; do
   export "P8_PARAM_${array[$index]}"="$(cat .p8/${array[$index]})"
 done
+
 _p8
 
-rm -Rf $name_result
-rm -Rf $name
 rm -Rf .p8

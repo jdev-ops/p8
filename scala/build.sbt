@@ -9,6 +9,8 @@ lazy val root = (project in file("."))
       "org.scala-lang" %% "scala3-compiler" % scalaVersion.value,
       "org.apache.commons" % "commons-configuration2" % "2.8.0",
       "com.hubspot.jinjava" % "jinjava" % "2.7.0",
+      "com.github.scopt" %% "scopt" % "4.1.0",
+      "info.picocli" % "picocli" % "4.7.1",
     )
   )
 

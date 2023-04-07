@@ -2,6 +2,9 @@
 //> using lib "org.scala-lang::scala3-compiler:3.2.2"
 //> using lib "org.apache.commons:commons-configuration2:2.9.0"
 //> using lib "com.hubspot.jinjava:jinjava:2.7.0"
+//> using lib "info.picocli:picocli:4.7.1"
+
+// -- > using lib "com.github.scopt::scopt:4.1.0"
 
 import com.hubspot.jinjava.Jinjava
 import org.apache.commons.configuration2.INIConfiguration
@@ -88,8 +91,8 @@ def writeToFile(fileDir: String, content: String): Unit =
   fileWriter.write(content)
   fileWriter.close()
 
-@main
-def main(): Unit =
+//@main
+def mainGenerator(): Unit =
   val configurationFileName: String = Option(System.getenv("CONFIGURATION_FILE_NAME")).getOrElse(".default.ini")
   val selectorFileName: String = Option(System.getenv("SELECTOR_FILE_NAME")).getOrElse(".selector.ini")
   val prefix: String = Option(System.getenv("PARAMETERS_PREFIX")).getOrElse("P8_PARAM_")
@@ -136,3 +139,45 @@ def main(): Unit =
         Files.write(Paths.get(ndir, filePath), allBytes)
 
   })
+
+
+import java.util.concurrent.Callable
+import picocli.CommandLine
+import picocli.CommandLine.{Command, HelpCommand, Parameters}
+
+@Command(name = "p8", version = Array("p8 v0.1"),
+  description = Array("@|bold Generator"))
+class CLIApp extends Runnable {
+
+  @CommandLine.Option(arity = "2..3", names = Array("-g", "--get"), paramLabel = "GET", description = Array("Get INI values"))
+  private var scmds: Array[String] = Array()
+
+  @CommandLine.Option(names = Array("-h", "--help"), usageHelp = true, description = Array("print this help and exit"))
+  private var helpRequested = false
+
+  @CommandLine.Option(names = Array("-V", "--version"), versionHelp = true, description = Array("print version info and exit"))
+  private var versionRequested = false
+
+  def run(): Unit = {
+    if (helpRequested) new CommandLine(this).usage(System.err) else
+      if (versionRequested) new CommandLine(this).printVersionHelp(System.err) else
+        if (scmds.length > 0){
+          scmds.length match {
+            case 2 =>
+              val data = readDataFromINI(scmds(0), scmds(1))
+              for ((k, _) <- data) println(k)
+            case 3 =>
+              val data = readDataFromINI(scmds(0), scmds(1))
+              println(data(scmds(2)))
+            case _ => println("Wrong number of arguments")
+          }
+        }
+        else
+          mainGenerator()
+  }
+}
+
+
+@main
+def main(args: String*): Unit =
+  System.exit(new CommandLine(new CLIApp()).execute(args: _*))
