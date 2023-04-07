@@ -105,7 +105,7 @@ def mainGenerator(): Unit =
     println("DESTINATION_PATH is not set")
     System.exit(1)
   val config_path = Paths.get(path, configurationFileName).toString
-  val sData = readDataFromINI(config_path, "DOMAIN")
+  val sData = readDataFromINI(config_path)
   val support_data: mutable.Map[String, String | util.List[String]] = for ((k, v) <- sData) yield (k, convertToListWhenApply(v))
   val d = System.getenv()
   val data: mutable.Map[String, util.List[String] | String] = for ((k, v) <- d.asScala if k.startsWith(prefix)) yield (k.substring(prefix.length), convertToListWhenApply(v))
@@ -121,7 +121,7 @@ def mainGenerator(): Unit =
     if !File(ndir).isDirectory then
       Files.createDirectories(Paths.get(ndir))
     for f <- files if f.getName == selectorFileName do
-      val selectorDataCurrentDir = readDataFromINI(f.getAbsolutePath, "DEFAULT")
+      val selectorDataCurrentDir = readDataFromINI(f.getAbsolutePath)
       val dirActives = data(selectorDataCurrentDir("value")).asInstanceOf[util.List[String]].asScala.toSet
       val allDir = support_data(selectorDataCurrentDir("value")).asInstanceOf[util.List[String]].asScala.toSet
       for delDir <- allDir -- dirActives do
