@@ -37,11 +37,11 @@ fi
 
 name=$(cut -d "/" -f2- <<<$1)
 mkdir -p .p8
-git clone git@github.com:$1 --depth 1 .p8/$name >/dev/null 2>&1
+
+gum spin --title "Getting template..." -- git clone git@github.com:$1 --depth 1 .p8/$name
 
 export TEMPLATE_PATH=$(realpath .p8/$name)
 export DESTINATION_PATH=$(realpath .)
-
 
 joinByString() {
   local separator="$1"
@@ -50,10 +50,6 @@ joinByString() {
   shift
   printf "%s" "$first" "${@/#/$separator}"
 }
-
-# export GUM_CHOOSE_SELECTED_PREFIX="[ x ]"
-# export GUM_CHOOSE_UNSELECTED_PREFIX="[ ○ ]"
-# export GUM_CHOOSE_CURSOR="> "
 
 exitOption='==> DONE <=='
 while :; do
