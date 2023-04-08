@@ -37,7 +37,7 @@ fi
 
 name=$(cut -d "/" -f2- <<<$1)
 mkdir -p .p8
-git clone git@github.com:$1 --depth 1 .p8/$name
+git clone git@github.com:$1 --depth 1 .p8/$name >/dev/null 2>&1
 
 export TEMPLATE_PATH=$(realpath .p8/$name)
 export DESTINATION_PATH=$(realpath .)
@@ -51,14 +51,20 @@ joinByString() {
   printf "%s" "$first" "${@/#/$separator}"
 }
 
+# export GUM_CHOOSE_SELECTED_PREFIX="[ x ]"
+# export GUM_CHOOSE_UNSELECTED_PREFIX="[ ○ ]"
+# export GUM_CHOOSE_CURSOR="> "
+
+exitOption='==> DONE <=='
 while :; do
   array=$(crudini --get $TEMPLATE_PATH/.default.ini DEFAULT)
   array="$array
-done"
+$exitOption"
   IFS=$'\n'
   array2=($array)
+  export GUM_CHOOSE_HEADER="Set parameters values:"
   a=$(gum choose "${array2[@]}")
-  if [[ $a == done ]]; then
+  if [[ $a == $exitOption ]]; then
     break
   fi
   cValue=$(crudini --get $TEMPLATE_PATH/.default.ini DEFAULT $a)
@@ -66,6 +72,7 @@ done"
     cValue="${cValue:1}"
     IFS='|'
     read -a strarr <<<"$cValue"
+    export GUM_CHOOSE_HEADER="Choose submodules:"
     aValue=$(gum choose --no-limit "${strarr[@]}")
     if test -f ".p8/$a"; then
       rm ".p8/$a"
