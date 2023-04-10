@@ -5,14 +5,14 @@ shopt -s expand_aliases
 command -v _p8 >/dev/null 2>&1
 cmd_result=$?
 if [ $cmd_result -ne 0 ]; then
-    command -v _p8.jar >/dev/null 2>&1
-    cmd_result=$?
-    if [ $cmd_result -ne 0 ]; then
-      echo "You do not have _p8.jar in your path, please install it to continue"
-      exit 1
-    else
-      alias _p8="_p8.jar"
-    fi
+  command -v _p8.jar >/dev/null 2>&1
+  cmd_result=$?
+  if [ $cmd_result -ne 0 ]; then
+    echo "You do not have _p8.jar in your path, please install it to continue"
+    exit 1
+  else
+    alias _p8="_p8.jar"
+  fi
 fi
 
 command -v crudini >/dev/null 2>&1
@@ -36,6 +36,7 @@ if [ $cmd_result -ne 0 ]; then
 fi
 
 name=$(cut -d "/" -f2- <<<$1)
+
 mkdir -p .p8
 
 gum spin --title "Getting template..." -- git clone git@github.com:$1 --depth 1 .p8/$name
@@ -51,7 +52,7 @@ joinByString() {
   printf "%s" "$first" "${@/#/$separator}"
 }
 
-exitOption='==> DONE <=='
+exitOption='>>> Generate files <<<'
 while :; do
   array=$(crudini --get $TEMPLATE_PATH/.default.ini DEFAULT)
   array="$array
@@ -60,9 +61,11 @@ $exitOption"
   array2=($array)
   export GUM_CHOOSE_HEADER="Set parameters values:"
   a=$(gum choose "${array2[@]}")
+
   if [[ $a == $exitOption ]]; then
     break
   fi
+
   cValue=$(crudini --get $TEMPLATE_PATH/.default.ini DEFAULT $a)
   if [[ $cValue == '#'* ]]; then
     cValue="${cValue:1}"
@@ -70,6 +73,7 @@ $exitOption"
     read -a strarr <<<"$cValue"
     export GUM_CHOOSE_HEADER="Choose submodules:"
     aValue=$(gum choose --no-limit "${strarr[@]}")
+
     if test -f ".p8/$a"; then
       rm ".p8/$a"
     fi
@@ -80,9 +84,19 @@ $exitOption"
 
     echo -n "#"$aValue >.p8/$a
 
-  else
+  elif [[ $cValue == '@'* ]]; then
+    cValue="${cValue:1}"
+    aValue=$(gum table -w 20,6 -s '|' <$HOME/.p8/${cValue}.csv | cut -d '|' -f 2)
 
+    if test -f ".p8/$a"; then
+      rm ".p8/$a"
+    fi
+
+    echo -n $aValue >.p8/$a
+
+  else
     aValue=$(gum input --placeholder "$(crudini --get $TEMPLATE_PATH/.default.ini DEFAULT $a)")
+
     if [[ $aValue == "" ]]; then
       aValue="$(crudini --get $TEMPLATE_PATH/.default.ini DEFAULT $a)"
     fi
@@ -105,9 +119,20 @@ array=($array)
 for index in "${!array[@]}"; do
   key="${array[$index]}"
   value=$(crudini --get $TEMPLATE_PATH/.default.ini DEFAULT $key)
+
   if [ ! -f ".p8/$key" ]; then
-    echo -n $value >.p8/$key
+
+    if [[ $value == '@'* ]]; then
+      cValue="${value:1}"
+      aValue=$(cat $HOME/.p8/${cValue}.csv | sed -n '2 p' | cut -d '|' -f 2)
+      echo -n $aValue >.p8/$key
+
+    else
+      echo -n $value >.p8/$key
+    fi
+
   fi
+
 done
 
 array=$(ls -p .p8 | grep -v /)
@@ -120,4 +145,4 @@ done
 
 _p8
 
-rm -Rf .p8
+ rm -Rf .p8

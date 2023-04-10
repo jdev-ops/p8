@@ -2,19 +2,16 @@
 
 set -euo pipefail
 
-projects_organization="${PROJECTS_ORGANIZATION:-jdev-ops}"
+projects_organization=$(cat ~/.p8/gh-org)
 
-IFS=',' read -r -a array <<<"$PROJECT_TEMPLATES"
-echo -e "Choose template:"
-DIY_P8_TEMPLATE=$(gum choose ${array[@]})
+value=$(gum table -w 15,4,80 -s '|' <$HOME/.p8/repository-types.csv | cut -d '|' -f 2)
 
-INSTALL_COMMAND="p8 $projects_organization/$DIY_P8_TEMPLATE"
+templates_size=$(wc -l <$HOME/.p8/types/$value/templates.csv)
 
-echo -e "Wait for it..."
-$INSTALL_COMMAND
+if ((templates_size > 2)); then
+  template_name=$(gum table -w 15,50 -s '|' <$HOME/.p8/types/$value/templates.csv | cut -d '|' -f 2)
+else
+  template_name=$(cat $HOME/.p8/types/$value/templates.csv | sed -n '2 p' | cut -d '|' -f 2)
+fi
 
-FOLDER=$(ls -d */ | sed 's/.$//' | gum filter --placeholder "Select your project:")
-cd $FOLDER
-
-gum confirm "Init git repo?" && (git init && git add . && git commit -m "Initial commit")
-#(gum confirm "Launch VSCode?" && code .)
+p8 $projects_organization/$template_name
