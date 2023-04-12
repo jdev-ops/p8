@@ -2,16 +2,19 @@
 
 set -euo pipefail
 
-projects_organization=$(cat ~/.p8/gh-org)
+repo_template=$(cat ~/.p8/repo-template)
 
 value=$(gum table -w 15,4,80 -s '|' <$HOME/.p8/repository-types.csv | cut -d '|' -f 2)
 
 templates_size=$(wc -l <$HOME/.p8/types/$value/templates.csv)
 
 if ((templates_size > 2)); then
-  template_name=$(gum table -w 15,50 -s '|' <$HOME/.p8/types/$value/templates.csv | cut -d '|' -f 2)
+  params=$(gum table -w 15,50 -s '|' <$HOME/.p8/types/$value/templates.csv | cut -d '|' -f 2)
 else
-  template_name=$(cat $HOME/.p8/types/$value/templates.csv | sed -n '2 p' | cut -d '|' -f 2)
+  params=$(cat $HOME/.p8/types/$value/templates.csv | sed -n '2 p' | cut -d '|' -f 2)
 fi
 
-p8 $projects_organization/$template_name
+IFS=$','
+params=($params)
+
+p8 $repo_template "${params[@]}"

@@ -2,14 +2,12 @@
 //> using lib "org.scala-lang::scala3-compiler:3.2.2"
 //> using lib "org.apache.commons:commons-configuration2:2.9.0"
 //> using lib "com.hubspot.jinjava:jinjava:2.7.0"
-//> using lib "info.picocli:picocli:4.7.1"
-
-// -- > using lib "com.github.scopt::scopt:4.1.0"
+//> using lib "info.picocli:picocli:4.7.2"
 
 import com.hubspot.jinjava.Jinjava
 import org.apache.commons.configuration2.INIConfiguration
 
-import java.io.{File, FileReader, FileWriter}
+import java.io.{File, FileReader, FileWriter, Reader, StringReader, StringWriter}
 import java.nio.ByteBuffer
 import java.nio.charset.{CharacterCodingException, Charset}
 import java.util
@@ -20,6 +18,8 @@ import java.nio.file.{Files, Paths}
 import math.Fractional.Implicits.infixFractionalOps
 import math.Integral.Implicits.infixIntegralOps
 import math.Numeric.Implicits.infixNumericOps
+import scala.io.StdIn
+
 
 def mkString(args: String*): String =
   args.mkString("")
@@ -39,6 +39,8 @@ extension[T] (b: mutable.ListBuffer[T])
 extension (b: File)
   def startsWithAny(strs: String*): Boolean =
     strs.exists(b.getName.startsWith(_))
+  def containsAny(strs: String*): Boolean =
+    strs.contains(b.getName)
 
 def convertToListWhenApply(v: String): util.List[String] | String =
   if v.startsWith("#") then
@@ -56,12 +58,10 @@ def camelToSnake(str: String): String =
   // and convert it to lower case.
   str.replaceAll(regex, replacement).toLowerCase
 
-def readDataFromINI(path: String, segment: String = "DEFAULT"): mutable.HashMap[String, String] =
+def readINIFromReader(reader: Reader): mutable.HashMap[String, mutable.HashMap[String, String]] =
   val iniFileContents = new mutable.HashMap[String, mutable.HashMap[String, String]]
-  val fileToParse = new File(path)
   val iniConfiguration = new INIConfiguration()
-  val fileReader = new FileReader(fileToParse)
-  iniConfiguration.read(fileReader)
+  iniConfiguration.read(reader)
   for section <- iniConfiguration.getSections.asScala do
     val subSectionMap = new mutable.HashMap[String, String]
     val confSection = iniConfiguration.getSection(section)
@@ -71,7 +71,17 @@ def readDataFromINI(path: String, segment: String = "DEFAULT"): mutable.HashMap[
       val value = confSection.getProperty(key).toString
       subSectionMap.put(key, value)
     iniFileContents.put(section, subSectionMap)
-  iniFileContents(segment)
+  iniFileContents
+
+def writeMapToINI(data: mutable.HashMap[String, mutable.HashMap[String, String]], out: String): Unit =
+  val iniConfiguration = new INIConfiguration()
+  for (key, value) <- data do
+    val section = iniConfiguration.getSection(key)
+    for (key2, value2) <- value do
+      section.addProperty(key2, value2)
+
+  val fileWriter = new FileWriter(new File(out))
+  iniConfiguration.write(fileWriter)
 
 object os:
   def walk(start: File, body: (String, mutable.ListBuffer[File], Seq[File]) => Unit): Unit =
@@ -105,7 +115,7 @@ def mainGenerator(): Unit =
     println("DESTINATION_PATH is not set")
     System.exit(1)
   val config_path = Paths.get(path, configurationFileName).toString
-  val sData = readDataFromINI(config_path)
+  val sData = readINIFromReader(FileReader(config_path)).getOrElse("DEFAULT", mutable.HashMap[String, String]())
   val support_data: mutable.Map[String, String | util.List[String]] = for ((k, v) <- sData) yield (k, convertToListWhenApply(v))
   val d = System.getenv()
   val data: mutable.Map[String, util.List[String] | String] = for ((k, v) <- d.asScala if k.startsWith(prefix)) yield (k.substring(prefix.length), convertToListWhenApply(v))
@@ -114,14 +124,14 @@ def mainGenerator(): Unit =
   val jinjava = new Jinjava();
 
   os.walk(new File(path), (root, dirs, files) => {
-    dirs.remove(_.startsWithAny(".git", ".idea"))
+    dirs.remove(_.containsAny(".git", ".idea"))
     val nroot = root.substring(path.length)
     var template = Paths.get(destination, nroot).toString
     val ndir = jinjava.render(template, jdata)
     if !File(ndir).isDirectory then
       Files.createDirectories(Paths.get(ndir))
     for f <- files if f.getName == selectorFileName do
-      val selectorDataCurrentDir = readDataFromINI(f.getAbsolutePath)
+      val selectorDataCurrentDir = readINIFromReader(FileReader(f.getAbsolutePath)).getOrElse("DEFAULT", mutable.HashMap[String, String]())
       val dirActives = data(selectorDataCurrentDir("value")).asInstanceOf[util.List[String]].asScala.toSet
       val allDir = support_data(selectorDataCurrentDir("value")).asInstanceOf[util.List[String]].asScala.toSet
       for delDir <- allDir -- dirActives do
@@ -150,7 +160,10 @@ import picocli.CommandLine.{Command, HelpCommand, Parameters}
 class CLIApp extends Runnable {
 
   @CommandLine.Option(arity = "2..3", names = Array("-g", "--get"), paramLabel = "GET", description = Array("Get INI values"))
-  private var scmds: Array[String] = Array()
+  private var getSubCmds: Array[String] = Array()
+
+  @CommandLine.Option(arity = "1", names = Array("-m", "--merge"), paramLabel = "MERGE", description = Array("Merge INI file with stdin"))
+  private var mergeParams: Array[String] = Array()
 
   @CommandLine.Option(names = Array("-h", "--help"), usageHelp = true, description = Array("print this help and exit"))
   private var helpRequested = false
@@ -161,16 +174,37 @@ class CLIApp extends Runnable {
   def run(): Unit = {
     if (helpRequested) new CommandLine(this).usage(System.err) else
       if (versionRequested) new CommandLine(this).printVersionHelp(System.err) else
-        if (scmds.length > 0){
-          scmds.length match {
+        if (getSubCmds.length > 0){
+          getSubCmds.length match {
             case 2 =>
-              val data = readDataFromINI(scmds(0), scmds(1))
+              val data: mutable.HashMap[String, String] = readINIFromReader(FileReader(getSubCmds(0))).getOrElse(getSubCmds(1), mutable.HashMap[String, String]())
               for ((k, _) <- data) println(k)
             case 3 =>
-              val data = readDataFromINI(scmds(0), scmds(1))
-              println(data(scmds(2)))
+              val data: mutable.HashMap[String, String] = readINIFromReader(FileReader(getSubCmds(0))).getOrElse(getSubCmds(1), mutable.HashMap[String, String]())
+              println(data(getSubCmds(2)))
             case _ => println("Wrong number of arguments")
           }
+        } else if (mergeParams.length > 0){
+              var result = ""
+              var line = ""
+              while ( {
+                line = StdIn.readLine(); line != null
+              }) {
+                result += line + "\n"
+              }
+              val f1 = readINIFromReader(FileReader(mergeParams(0)))
+              val f2 = readINIFromReader(StringReader(result))
+              for (key, value) <- f1 do
+                for (key2, value2) <- value do
+                  if f2.contains(key) && f2(key).contains(key2) then
+                    f2(key)(key2) = value2
+                  else if f2.contains(key) then
+                    f2(key).put(key2, value2)
+                  else
+                    f2.put(key, mutable.HashMap(key2 -> value2))
+
+              writeMapToINI(f2, mergeParams(0))
+
         }
         else
           mainGenerator()

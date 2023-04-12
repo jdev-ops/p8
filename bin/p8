@@ -35,13 +35,44 @@ if [ $cmd_result -ne 0 ]; then
   exit 1
 fi
 
-name=$(cut -d "/" -f2- <<<$1)
-
 mkdir -p .p8
 
-gum spin --title "Getting template..." -- git clone git@github.com:$1 --depth 1 .p8/$name
+USAGE="Usage: $0 <repo> dir1 dir2 ... dirN"
 
-export TEMPLATE_PATH=$(realpath .p8/$name)
+if [ "$#" -lt 2 ]; then
+  echo "$USAGE"
+  exit 1
+fi
+
+templates_repo="$1"
+shift
+
+current_path=$(pwd)
+prefix_path=".p8/templates"
+gum spin --title "Getting template..." -- git clone --no-checkout git@github.com:$templates_repo.git --depth 1 $prefix_path
+cd $prefix_path
+git sparse-checkout init --cone
+git sparse-checkout set "$@"
+git checkout main >/dev/null 2>&1
+
+template_path="$1"
+shift
+
+while (("$#")); do
+  if [ -f "$1/.default.ini" ]; then
+    crudini --merge $template_path/.default.ini <$1/.default.ini
+    rm -rf $1/.default.ini
+    first_dir=$(ls -p $template_path | grep / | sed -n '1 p')
+    (
+      shopt -s dotglob
+      cp -R -n $1/* $template_path/$first_dir
+    )
+  fi
+  shift
+done
+
+cd $current_path
+export TEMPLATE_PATH=$(realpath $prefix_path/$template_path)
 export DESTINATION_PATH=$(realpath .)
 
 joinByString() {
@@ -145,4 +176,4 @@ done
 
 _p8
 
- rm -Rf .p8
+rm -Rf .p8
