@@ -36,11 +36,21 @@ extension[T] (b: mutable.ListBuffer[T])
   def remove(filter: T => Boolean): Unit =
     b.filterInPlace(!filter(_))
 
+extension (b: Seq[File])
+  def removeAllWhenAny(filter: (File, Seq[File]) => Seq[File], cond: File => Boolean): Seq[File] =
+    val ffs: Seq[File] = b.filter(cond)
+    if ffs.isEmpty then
+      b
+    else
+      filter(ffs.head, b.filter(!cond(_)))
+
 extension (b: File)
   def startsWithAny(strs: String*): Boolean =
     strs.exists(b.getName.startsWith(_))
   def containsAny(strs: String*): Boolean =
     strs.contains(b.getName)
+  def startsWith(str: String): Boolean =
+    b.getName.startsWith(str)
 
 def convertToListWhenApply(v: String): util.List[String] | String =
   if v.startsWith("#") then
@@ -105,6 +115,7 @@ def writeToFile(fileDir: String, content: String): Unit =
 def mainGenerator(): Unit =
   val configurationFileName: String = Option(System.getenv("CONFIGURATION_FILE_NAME")).getOrElse(".default.ini")
   val selectorFileName: String = Option(System.getenv("SELECTOR_FILE_NAME")).getOrElse(".selector.ini")
+  val filesSelectorFileName: String = Option(System.getenv("FILE_SELECTOR_FILE_NAME")).getOrElse(".files-selector.ini")
   val prefix: String = Option(System.getenv("PARAMETERS_PREFIX")).getOrElse("P8_PARAM_")
   val path: String = System.getenv("TEMPLATE_PATH")
   if path == null then
@@ -130,14 +141,29 @@ def mainGenerator(): Unit =
     val ndir = jinjava.render(template, jdata)
     if !File(ndir).isDirectory then
       Files.createDirectories(Paths.get(ndir))
-    for f <- files if f.getName == selectorFileName do
-      val selectorDataCurrentDir = readINIFromReader(FileReader(f.getAbsolutePath)).getOrElse("DEFAULT", mutable.HashMap[String, String]())
-      val dirActives = data(selectorDataCurrentDir("value")).asInstanceOf[util.List[String]].asScala.toSet
-      val allDir = support_data(selectorDataCurrentDir("value")).asInstanceOf[util.List[String]].asScala.toSet
-      for delDir <- allDir -- dirActives do
-        dirs.remove(_.getName == delDir)
 
-    for f <- files if f.getName != configurationFileName && f.getName != selectorFileName do
+    for (f <- files.find(_.getName == selectorFileName)) do
+        val selectorDataCurrentDir = readINIFromReader(FileReader(f.getAbsolutePath)).getOrElse("DEFAULT", mutable.HashMap[String, String]())
+        val dirActives = data(selectorDataCurrentDir("value")).asInstanceOf[util.List[String]].asScala.toSet
+        val allDir = support_data(selectorDataCurrentDir("value")).asInstanceOf[util.List[String]].asScala.toSet
+        for delDir <- allDir -- dirActives do
+          dirs.remove(_.getName == delDir)
+
+    def fileNamesConstraints(selectorINIFile: File, filesToFilter: Seq[File]): Seq[File] = {
+      val content = readINIFromReader(FileReader(selectorINIFile.getAbsolutePath))
+      val fSelectorDataSelector = content.getOrElse("SELECTOR", mutable.HashMap[String, String]())
+      val fSelectorDataDefault = content.getOrElse("DEFAULT", mutable.HashMap[String, String]())
+      val activeNames = data(fSelectorDataDefault("value")).asInstanceOf[util.List[String]].asScala.toList
+      fSelectorDataSelector.keys.toList.head match
+        case "samePrefix" =>
+          val param = fSelectorDataSelector("samePrefix")
+          val size = param.toInt
+          val names: List[String] = activeNames.map(_.substring(0, size).toLowerCase)
+          filesToFilter.filter(f => names.exists(f.getName.toLowerCase.startsWith(_)))
+        case _ => filesToFilter
+    }
+
+    for f <- files.removeAllWhenAny(fileNamesConstraints, _.getName == filesSelectorFileName) if f.getName != configurationFileName && f.getName != selectorFileName do
       val allBytes = Files.readAllBytes(Paths.get(f.getCanonicalPath))
       if isValidUTF8(allBytes) then
         template = readFile(f)
