@@ -12,7 +12,7 @@ else
 
   if [ -d "$HOME/.$script_file_name" ]; then
     cd ~/.$script_file_name
-    gum spin --title "Getting configuration repository" -- git fetch --all
+    gum spin --title "Updating configuration repository" -- git fetch --all
     git reset --hard origin/main >/dev/null 2>&1
   else
     gum spin --title "Getting configuration repository" -- git clone $P8_CONFIGURATION_REPO ~/.$script_file_name
