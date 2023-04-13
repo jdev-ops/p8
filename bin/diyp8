@@ -2,19 +2,39 @@
 
 set -euo pipefail
 
-repo_template=$(cat ~/.p8/repo-template)
-
-value=$(gum table -w 15,4,80 -s '|' <$HOME/.p8/repository-types.csv | cut -d '|' -f 2)
-
-templates_size=$(wc -l <$HOME/.p8/types/$value/templates.csv)
-
-if ((templates_size > 2)); then
-  params=$(gum table -w 15,50 -s '|' <$HOME/.p8/types/$value/templates.csv | cut -d '|' -f 2)
+if [ -z ${P8_CONFIGURATION_REPO+x} ]; then
+  echo "The environment variable P8_CONFIGURATION_REPO is not set. You need to set it to the path of the configuration repository."
 else
-  params=$(cat $HOME/.p8/types/$value/templates.csv | sed -n '2 p' | cut -d '|' -f 2)
+
+  script_file_name=$(basename "$0")
+
+  current_path=$(pwd)
+
+  if [ -d "$HOME/.$script_file_name" ]; then
+    cd ~/.$script_file_name
+    gum spin --title "Getting configuration repository" -- git fetch --all
+    git reset --hard origin/main >/dev/null 2>&1
+  else
+    gum spin --title "Getting configuration repository" -- git clone $P8_CONFIGURATION_REPO ~/.$script_file_name
+  fi
+
+  cd $current_path
+
+  repo_template=$(cat ~/.$script_file_name/repo-templates)
+
+  value=$(gum table -w 15,4,80 -s '|' <$HOME/.$script_file_name/repository-types.csv | cut -d '|' -f 2)
+
+  templates_size=$(wc -l <$HOME/.$script_file_name/types/$value/templates.csv)
+
+  if ((templates_size > 2)); then
+    params=$(gum table -w 15,50 -s '|' <$HOME/.$script_file_name/types/$value/templates.csv | cut -d '|' -f 2)
+  else
+    params=$(cat $HOME/.$script_file_name/types/$value/templates.csv | sed -n '2 p' | cut -d '|' -f 2)
+  fi
+
+  IFS=$','
+  params=($params)
+
+  p8 $repo_template "${params[@]}"
+
 fi
-
-IFS=$','
-params=($params)
-
-p8 $repo_template "${params[@]}"

@@ -49,7 +49,7 @@ shift
 
 current_path=$(pwd)
 prefix_path=".p8/templates"
-gum spin --title "Getting template..." -- git clone --no-checkout git@github.com:$templates_repo.git --depth 1 $prefix_path
+gum spin --title "Getting templates" -- git clone --no-checkout git@github.com:$templates_repo.git --depth 1 $prefix_path
 cd $prefix_path
 git sparse-checkout init --cone
 git sparse-checkout set "$@"

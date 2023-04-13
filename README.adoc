@@ -1,0 +1,32 @@
+= p8 tool
+
+== Install (Python way)
+
+[source,bash]
+----------------
+pip install --no-cache-dir -U https://github.com/jdev-ops/p8/archive/dev.zip
+----------------
+
+== Install (manual way)
+
+Download the latest link:https://github.com/jdev-ops/p8/releases[release] and put it on your path.
+
+== Usage
+
+[IMPORTANT]
+================
+You need to have the environment variable `P8_CONFIGURATION_REPO` set to a configuration repository.
+================
+
+[source,bash]
+----------------
+diyp8
+----------------
+
+=== Configuration
+
+The configuration repository is a git repository that contains:
+
+* a `repo-templates` file that contains the name of the repository with all the templates
+* a 3 colummns `repository-types.csv` file with a first level of clasification of the repositories. The second column is a code that is use to identify the folder in wich the templates of that type of repository are located.
+* a `types` folder with a subfolder for each type of repository.
