@@ -37,13 +37,15 @@ fi
 
 mkdir -p .p8
 
-USAGE="Usage: $0 <repo> dir1 dir2 ... dirN"
+USAGE="Usage: $0 <configDirPath> <repo> dir1 dir2 ... dirN"
 
 if [ "$#" -lt 2 ]; then
   echo "$USAGE"
   exit 1
 fi
 
+configDirPath="$1"
+shift
 templates_repo="$1"
 shift
 
@@ -86,6 +88,20 @@ joinByString() {
 exitOption='>>> Generate files <<<'
 while :; do
   array=$(crudini --get $TEMPLATE_PATH/.default.ini DEFAULT)
+
+  IFS=$'\n'
+  array=($array)
+
+  res=""
+  for index in "${!array[@]}"; do
+    v=$(crudini --get $TEMPLATE_PATH/.default.ini DEFAULT "${array[$index]}")
+    if [[ $v != '!'* ]]; then
+      res+="${array[$index]}\n"
+    fi
+  done
+
+  array=$(echo -e $res)
+
   array="$array
 $exitOption"
   IFS=$'\n'
@@ -117,7 +133,7 @@ $exitOption"
 
   elif [[ $cValue == '@'* ]]; then
     cValue="${cValue:1}"
-    aValue=$(gum table -w 20,6 -s '|' <$HOME/.p8/${cValue}.csv | cut -d '|' -f 2)
+    aValue=$(gum table -w 20,6 -s '|' <$configDirPath/${cValue}.csv | cut -d '|' -f 2)
 
     if test -f ".p8/$a"; then
       rm ".p8/$a"
@@ -155,7 +171,17 @@ for index in "${!array[@]}"; do
 
     if [[ $value == '@'* ]]; then
       cValue="${value:1}"
-      aValue=$(cat $HOME/.p8/${cValue}.csv | sed -n '2 p' | cut -d '|' -f 2)
+      aValue=$(cat $configDirPath/${cValue}.csv | sed -n '2 p' | cut -d '|' -f 2)
+      echo -n $aValue >.p8/$key
+
+    elif [[ $value == '!'* ]]; then
+      cValue="${value:1}"
+      aValue=$(cat $configDirPath/${cValue})
+
+      if test -f ".p8/$a"; then
+        rm ".p8/$a"
+      fi
+
       echo -n $aValue >.p8/$key
 
     else

@@ -12,8 +12,7 @@ else
 
   if [ -d "$HOME/.$script_file_name" ]; then
     cd ~/.$script_file_name
-    gum spin --title "Updating configuration repository" -- git fetch --all
-    git reset --hard origin/main >/dev/null 2>&1
+    gum spin --title "Updating configuration repository" -- git pull --rebase
   else
     gum spin --title "Getting configuration repository" -- git clone $P8_CONFIGURATION_REPO ~/.$script_file_name
   fi
@@ -35,6 +34,6 @@ else
   IFS=$','
   params=($params)
 
-  p8 $repo_template "${params[@]}"
+  p8 $HOME/.$script_file_name $repo_template "${params[@]}"
 
 fi
