@@ -88,10 +88,8 @@ joinByString() {
 exitOption='>>> Generate files <<<'
 while :; do
   array=$(crudini --get $TEMPLATE_PATH/.default.ini DEFAULT)
-
   IFS=$'\n'
   array=($array)
-
   res=""
   for index in "${!array[@]}"; do
     v=$(crudini --get $TEMPLATE_PATH/.default.ini DEFAULT "${array[$index]}")
@@ -99,7 +97,6 @@ while :; do
       res+="${array[$index]}\n"
     fi
   done
-
   array=$(echo -e $res)
 
   array="$array
@@ -121,39 +118,21 @@ $exitOption"
     export GUM_CHOOSE_HEADER="Choose submodules:"
     aValue=$(gum choose --no-limit "${strarr[@]}")
 
-    if test -f ".p8/$a"; then
-      rm ".p8/$a"
-    fi
-
     IFS=$'\n'
     aValue=($aValue)
     aValue=$(joinByString "|" "${aValue[@]}")
-
     echo -n "#"$aValue >.p8/$a
 
   elif [[ $cValue == '@'* ]]; then
     cValue="${cValue:1}"
-    aValue=$(gum table -w 20,6 -s '|' <$configDirPath/${cValue}.csv | cut -d '|' -f 2)
-
-    if test -f ".p8/$a"; then
-      rm ".p8/$a"
-    fi
-
+    aValue=$(gum table -w 40,6 -s '|' <$configDirPath/${cValue}.csv | cut -d '|' -f 2)
     echo -n $aValue >.p8/$a
-
   else
     aValue=$(gum input --placeholder "$(crudini --get $TEMPLATE_PATH/.default.ini DEFAULT $a)")
-
     if [[ $aValue == "" ]]; then
       aValue="$(crudini --get $TEMPLATE_PATH/.default.ini DEFAULT $a)"
     fi
-
-    if test -f ".p8/$a"; then
-      rm ".p8/$a"
-    fi
-
     echo -n $aValue >.p8/$a
-
   fi
 
 done
@@ -177,15 +156,11 @@ for index in "${!array[@]}"; do
     elif [[ $value == '!'* ]]; then
       cValue="${value:1}"
       aValue=$(cat $configDirPath/${cValue})
-
-      if test -f ".p8/$a"; then
-        rm ".p8/$a"
-      fi
-
       echo -n $aValue >.p8/$key
 
     else
       echo -n $value >.p8/$key
+
     fi
 
   fi
