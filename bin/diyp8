@@ -26,7 +26,7 @@ else
   templates_size=$(wc -l <$HOME/.$script_file_name/types/$value/templates.csv)
 
   if ((templates_size > 2)); then
-    params=$(gum table -w 15,50 -s '|' <$HOME/.$script_file_name/types/$value/templates.csv | cut -d '|' -f 2)
+    params=$(gum table -w 30,50 -s '|' <$HOME/.$script_file_name/types/$value/templates.csv | cut -d '|' -f 2)
   else
     params=$(cat $HOME/.$script_file_name/types/$value/templates.csv | sed -n '2 p' | cut -d '|' -f 2)
   fi
